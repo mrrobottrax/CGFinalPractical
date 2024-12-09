@@ -58,9 +58,9 @@ Shader "Custom/Star"
 
 			float3 Hue(float degrees)
 			{
-				float red = abs(degrees * 6 - 3) - 1;
-				float green = 2 - abs(degrees * 6 - 2);
-				float blue = 2 - abs(degrees * 6 - 4);
+				float red = abs(6 * degrees - 3) - 1;
+				float green = -abs(6 * degrees - 2) + 2;
+				float blue = -abs(6 * degrees - 4) + 2;
 				return saturate(float3(red, green, blue));
 			}
 

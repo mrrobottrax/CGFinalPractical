@@ -5,7 +5,9 @@ Shader "Custom/Hologram"
         _Color ("Color", Color) = (1,1,1,1)
         _MainTex ("Albedo (RGB)", 2D) = "white" {}
         _HoloTex ("Hologram Texture", 2D) = "white" {}
-		_HoloSpeed ("Scroll Speed", Float) = 1 
+		_HoloSpeed ("Scroll Speed", Float) = 1
+		_RimPower ("Rim Exponent", Float) = 2
+		_RimColor ("Rim Color", Color) = (1, 1, 1, 1)
     }
     SubShader
     {
@@ -33,6 +35,9 @@ Shader "Custom/Hologram"
 			float3 _Color;
 			float _HoloSpeed;
 
+			float4 _RimColor;
+			float _RimPower;
+
 			TEXTURE2D(_MainTex);
 			SAMPLER(sampler_MainTex);
 
@@ -50,9 +55,10 @@ Shader "Custom/Hologram"
 
 			struct Varyings
 			{
-				float4 positionWS	: SV_POSITION;
+				float4 positionCS	: SV_POSITION;
 				float2 uv			: TEXCOORD;
 				float3 normalWS		: NORMAL;
+				float3 viewDirWS	: TEXCOORD1;
 			};
 
 			Varyings vert(Attributes IN)
@@ -60,7 +66,11 @@ Shader "Custom/Hologram"
 				Varyings OUT;
 
 				OUT.normalWS = TransformObjectToWorldNormal(IN.normalOS);
-				OUT.positionWS = TransformObjectToHClip(IN.positionOS);
+
+				float3 positionWS = TransformObjectToWorld(IN.positionOS);
+				OUT.positionCS = TransformWorldToHClip(positionWS);
+				OUT.viewDirWS = normalize(GetWorldSpaceViewDir(positionWS));
+
 				OUT.uv = IN.uv;
 
 				return OUT;
@@ -70,18 +80,24 @@ Shader "Custom/Hologram"
 			{
 				float3 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv).rgb * _Color;
 
+				half3 normalWS = normalize(IN.normalWS);
+				half3 viewDirWS = normalize(IN.viewDirWS);
+
+				// Lighting
 				Light mainLight = GetMainLight();
                 half3 lightDir = normalize(mainLight.direction);
-
-				half3 normalWS = normalize(IN.normalWS);
 
 				// Use half lambert for a more cartoonish look
 				half lambert = dot(normalWS, lightDir) * 0.5 + 0.5;
 				lambert = lambert * lambert;
 
-				float3 finalColor = color * lambert;
+				// Rim lighting
+				half rim = saturate(1 - dot(normalWS, viewDirWS));
+				rim = pow(rim, _RimPower);
 
-				// Scroll holo texture
+				float3 finalColor = color * lambert + rim * _RimColor;
+
+				// Scroll holo texture for alpha
 				float scroll = -_Time.y * _HoloSpeed;
 				float holo = SAMPLE_TEXTURE2D(_HoloTex, sampler_HoloTex, IN.uv + float2(0, scroll)).a;
 
